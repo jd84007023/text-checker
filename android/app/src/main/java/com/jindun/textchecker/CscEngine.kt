@@ -20,8 +20,8 @@ class CscEngine(context: Context) {
 
     init {
         val opts = OrtSession.SessionOptions().apply {
-            intraOpNumThreads = 4
-            interOpNumThreads = 1
+            setIntraOpNumThreads(4)
+            setInterOpNumThreads(1)
         }
         context.assets.open(MODEL_FILE).use { input ->
             session = env.createSession(input.readBytes(), opts)
@@ -69,7 +69,7 @@ class CscEngine(context: Context) {
                                 if (row[v] > bestVal) { bestVal = row[v]; best = v }
                             }
                             var sumExp = 0.0
-                            for (v in row.indices) sumExp += Math.exp(row[v] - bestVal)
+                            for (v in row.indices) sumExp += Math.exp((row[v] - bestVal).toDouble())
                             val confidence = 1.0 / sumExp  // exp(0)/Σexp(row-max)
                             if (confidence < CONFIDENCE_MIN) continue
                             val pred = tokenizer.convertIdToToken(best) ?: continue

@@ -5,7 +5,7 @@ package com.jindun.textchecker
  * 逐字处理中文；英文/数字整词 WordPiece；每个 token 携带原文起始偏移
  * 词汇表从 assets/vocab.txt 加载，行号即 token id
  */
-class BertTokenizer(vocabLines: List<String>) {
+class BertTokenizer(private val vocabLines: List<String>) {
 
     data class TokenInfo(val token: String, val charIndex: Int)  // charIndex=-1 为特殊符号
 
