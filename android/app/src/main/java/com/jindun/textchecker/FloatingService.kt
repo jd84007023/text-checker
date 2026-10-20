@@ -41,6 +41,8 @@ class FloatingService : Service() {
 
     private lateinit var wm: WindowManager
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val aiExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private var cscEngine: CscEngine? = null
     private var bubble: View? = null
     private var panel: LinearLayout? = null
     private var webView: WebView? = null
@@ -56,6 +58,9 @@ class FloatingService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        aiExecutor.shutdown()
+        cscEngine?.close()
+        cscEngine = null
         hidePanel()
         bubble?.let { wm.removeView(it) }
         bubble = null
@@ -230,5 +235,38 @@ class FloatingService : Service() {
                 hidePanel()
             }
         }
+
+        /** 本地 AI 检查：JS 线程调用，转后台线程推理，结果经 receiveAi 回传 */
+        @JavascriptInterface
+        fun runAi(text: String) {
+            aiExecutor.execute {
+                try {
+                    val engine = cscEngine ?: CscEngine(this@FloatingService).also {
+                        cscEngine = it
+                    }
+                    val suggestions = engine.infer(text)
+                    val arr = org.json.JSONArray()
+                    suggestions.forEach { s ->
+                        val o = org.json.JSONObject()
+                        o.put("index", s.index)
+                        o.put("original", s.original)
+                        o.put("suggestion", s.suggestion)
+                        arr.put(o)
+                    }
+                    val json = arr.toString()
+                    mainHandler.post {
+                        webView?.evaluateJavascript("window.receiveAi(${JSONObject.quote(json)});", null)
+                    }
+                } catch (e: Throwable) {
+                    mainHandler.post {
+                        Toast.makeText(this@FloatingService, "AI 检查失败: ${e.message}", Toast.LENGTH_LONG).show()
+                        webView?.evaluateJavascript("window.receiveAi('[]');", null)
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun aiDone() { /* 预留：AI 结果回传完成回调 */ }
     }
 }

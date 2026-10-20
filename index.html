@@ -47,6 +47,12 @@
     padding:12px;font-size:15px;line-height:1.8;margin-bottom:12px;white-space:pre-wrap;word-break:break-all}
   .hl-red{background:#fee2e2;border-bottom:2px solid var(--red)}
   .hl-gray{background:#f3f4f6;border-bottom:2px dashed #9ca3af}
+  .issue.blue{background:#eff6ff;border-color:#bfdbfe}
+  .tag.blue{background:var(--primary);color:#fff}
+  .issue .sug.blue{color:var(--primary)}
+  .btn-ai{background:#eff6ff;color:var(--primary);border:1px dashed var(--primary)}
+  .btn-ai:disabled{opacity:.5}
+  .ai-wait{color:var(--muted);font-size:13px;padding:10px}
 </style>
 </head>
 <body>
@@ -56,9 +62,11 @@
 <textarea id="input" placeholder="把微信里写好的话粘贴到这里，点「检查」"></textarea>
 <div class="btnrow">
   <button class="btn-main" onclick="doCheck(true)">立即检查</button>
+  <button class="btn-ai" id="btnAi" onclick="doAiCheck()" style="display:none">本地AI检查</button>
   <button class="btn-sec" onclick="doClear()">清空</button>
 </div>
 <div id="result" class="result"></div>
+<div id="aiBox" class="result"></div>
 
 <div class="footer">红=确定有问题，灰=建议看看（可忽略）<br>
 修正后文本在「一键修正」下方，点「复制修正文本」再回微信粘贴</div>
@@ -175,6 +183,72 @@ if(navigator.clipboard && navigator.clipboard.readText){
       }).catch(function(){ /* 无权限则忽略 */ });
     }
   });
+}
+
+/* ================= 本地 AI 检查（仅 Android 桥存在时可用） ================= */
+var aiIssues = [];
+
+/* Kotlin 推理完成后调用：json = [{original, suggestion, index}] */
+window.receiveAi = function(json){
+  try { aiIssues = JSON.parse(json) || []; } catch(e){ aiIssues = []; }
+  doCheck(false);            /* 重跑本地规则（文本可能已含改动则由前端另处理） */
+  renderAi();
+  if(window.AndroidBridge && window.AndroidBridge.aiDone){
+    window.AndroidBridge.aiDone();
+  }
+};
+
+function doAiCheck(){
+  if(!(window.AndroidBridge && window.AndroidBridge.runAi)){
+    alert('本地AI引擎不可用'); return;
+  }
+  var text = document.getElementById('input').value;
+  if(!text.trim()){ alert('请先输入要检查的文字'); return; }
+  aiIssues = [];
+  document.getElementById('aiBox').innerHTML =
+    '<div class="ai-wait">本地AI检查中，约需 1 秒…</div>';
+  /* 文本须经 JSON 桥传输：交给 Kotlin 侧编码后回传再执行，避免引号注入 */
+  window.AndroidBridge.runAi(text);
+}
+
+function renderAi(){
+  var box = document.getElementById('aiBox');
+  if(!aiIssues.length){
+    box.innerHTML = '<div class="banner green">✓ AI 检查通过，没有发现音近词/语病问题</div>';
+    return;
+  }
+  var html = '<div class="summary">AI 发现 '+aiIssues.length+' 处疑似错误（蓝色，需你确认后采纳）</div>';
+  aiIssues.forEach(function(i, idx){
+    html += '<div class="issue blue">'+
+      '<span class="tag blue">AI建议</span>'+
+      '<span class="tag">疑似错字</span>'+
+      '<div style="margin-top:6px"><span class="orig">'+esc(i.original)+'</span>&rarr;'+
+      '<span class="sug blue">'+esc(i.suggestion)+'</span></div>'+
+      '<div class="msg">位置：第 '+(i.index+1)+' 字</div>'+
+      '<div class="btnrow" style="margin:8px 0 0"><button class="btn-ai" onclick="applyAi('+idx+')">采纳</button></div>'+
+      '</div>';
+  });
+  box.innerHTML = html;
+}
+
+function applyAi(idx){
+  var item = aiIssues[idx];
+  if(!item) return;
+  var input = document.getElementById('input');
+  var text = input.value;
+  if(text.substr(item.index, item.original.length) !== item.original){
+    alert('文本已变化，请重新检查后再采纳'); return;
+  }
+  input.value = text.slice(0, item.index) + item.suggestion + text.slice(item.index + item.original.length);
+  aiIssues.splice(idx, 1);
+  doCheck(false);
+  renderAi();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* 仅 Android 桥可用时显示 AI 按钮；网页版隐藏 */
+if(window.AndroidBridge && window.AndroidBridge.runAi){
+  document.getElementById('btnAi').style.display = '';
 }
 </script>
 </body>
