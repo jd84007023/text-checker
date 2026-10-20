@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="文字检查器"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="状态："
+        android:textSize="14sp"
+        android:textColor="#6B7280"
+        android:layout_marginBottom="20dp" />
+
+    <Button
+        android:id="@+id/btnPermission"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="第一步：授权悬浮窗权限" />
+
+    <Button
+        android:id="@+id/btnToggle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="第二步：启动悬浮球" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:textSize="14sp"
+        android:lineSpacingExtra="4dp"
+        android:text="使用方法：\n1. 在微信里写好话，全选复制\n2. 点屏幕上的蓝色「检」悬浮球\n3. 弹出卡片显示问题，可一键修正\n4. 点「复制修正文本」，回微信粘贴\n\n三星手机授权路径：\n设置 → 应用 → 文字检查器 → 出现在顶部（或：设置 → 更多设置 → 特殊权限 → 显示在其他应用上层）\n\n本应用不联网：检查引擎内置在安装包内，可在系统设置中确认其无网络权限。" />
+</LinearLayout>

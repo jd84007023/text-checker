@@ -1,0 +1,55 @@
+{
+  "sha": "4f3f0ef9515ca1709842f73647003b693a690c71",
+  "url": "https://api.github.com/repos/ProMax-Ultra/chinese-words/git/trees/4f3f0ef9515ca1709842f73647003b693a690c71",
+  "tree": [
+    {
+      "path": ".gitattributes",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e0a96b7765c0669a11c825f3102e3824d88d717",
+      "size": 89,
+      "url": "https://api.github.com/repos/ProMax-Ultra/chinese-words/git/blobs/2e0a96b7765c0669a11c825f3102e3824d88d717"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ed6aaa7f39e689ff75883fafe16a9177268e85c1",
+      "size": 102,
+      "url": "https://api.github.com/repos/ProMax-Ultra/chinese-words/git/blobs/ed6aaa7f39e689ff75883fafe16a9177268e85c1"
+    },
+    {
+      "path": "现代汉语常用词表 （第2版）.pdf",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c945249c17cb4a8f31c6fc721cae180732c7617",
+      "size": 134,
+      "url": "https://api.github.com/repos/ProMax-Ultra/chinese-words/git/blobs/5c945249c17cb4a8f31c6fc721cae180732c7617"
+    },
+    {
+      "path": "现代汉语常用词表（第2版）.csv",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e04d4e7195bb4969266947bddf0b853bc481a551",
+      "size": 1369179,
+      "url": "https://api.github.com/repos/ProMax-Ultra/chinese-words/git/blobs/e04d4e7195bb4969266947bddf0b853bc481a551"
+    },
+    {
+      "path": "现代汉语常用词表（第2版）.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6702585a1350c2d842df1b68ca11ecf4d1f145f0",
+      "size": 833538,
+      "url": "https://api.github.com/repos/ProMax-Ultra/chinese-words/git/blobs/6702585a1350c2d842df1b68ca11ecf4d1f145f0"
+    },
+    {
+      "path": "现代汉语常用词表（第2版）（拼音）.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a902848ffaf78f66f891a6dff66a962a7002608a",
+      "size": 1482755,
+      "url": "https://api.github.com/repos/ProMax-Ultra/chinese-words/git/blobs/a902848ffaf78f66f891a6dff66a962a7002608a"
+    }
+  ],
+  "truncated": false
+}

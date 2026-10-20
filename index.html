@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>文字检查器（离线版）</title>
+<script src="checker.js"></script>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#ffffff; --border:#e3e8ef; --text:#1f2937;
+    --muted:#6b7280; --red:#dc2626; --red-bg:#fef2f2; --red-border:#fecaca;
+    --gray:#6b7280; --gray-bg:#f9fafb; --gray-border:#e5e7eb;
+    --green:#16a34a; --green-bg:#f0fdf4; --green-border:#bbf7d0;
+    --primary:#2563eb;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);padding:16px;max-width:720px;margin:0 auto;}
+  h1{font-size:18px;margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+  textarea{width:100%;min-height:130px;padding:12px;font-size:16px;line-height:1.6;
+    border:1px solid var(--border);border-radius:10px;resize:vertical;background:var(--card);color:var(--text);}
+  textarea:focus{outline:2px solid var(--primary);outline-offset:-1px}
+  .btnrow{display:flex;gap:10px;margin:12px 0}
+  button{flex:1;padding:12px 0;font-size:15px;border:none;border-radius:10px;cursor:pointer;font-weight:600;}
+  .btn-main{background:var(--primary);color:#fff}
+  .btn-copy{background:#fff;color:var(--primary);border:1px solid var(--primary)}
+  .btn-sec{background:#fff;color:var(--muted);border:1px solid var(--border);flex:0 0 auto;padding:12px 16px}
+  .result{margin-top:6px}
+  .banner{display:none;padding:14px;border-radius:10px;font-size:15px;font-weight:600;margin-bottom:12px}
+  .banner.green{display:flex;align-items:center;gap:8px;background:var(--green-bg);
+    border:1px solid var(--green-border);color:var(--green)}
+  .issue{background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:12px;margin-bottom:10px;font-size:14px}
+  .issue.red{background:var(--red-bg);border-color:var(--red-border)}
+  .issue.gray{background:var(--gray-bg);border-color:var(--gray-border)}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;margin-right:6px;font-weight:600}
+  .tag.red{background:var(--red);color:#fff}
+  .tag.gray{background:#d1d5db;color:#374151}
+  .tag.fix{background:#dbeafe;color:var(--primary)}
+  .issue .orig{color:var(--red);text-decoration:line-through;margin-right:6px}
+  .issue .sug{color:var(--green);font-weight:700}
+  .issue .msg{color:var(--muted);font-size:13px;margin-top:4px}
+  .summary{font-size:13px;color:var(--muted);margin:10px 0}
+  .footer{margin-top:20px;font-size:11px;color:var(--muted);text-align:center;line-height:1.6}
+  .highlight-box{background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:12px;font-size:15px;line-height:1.8;margin-bottom:12px;white-space:pre-wrap;word-break:break-all}
+  .hl-red{background:#fee2e2;border-bottom:2px solid var(--red)}
+  .hl-gray{background:#f3f4f6;border-bottom:2px dashed #9ca3af}
+</style>
+</head>
+<body>
+<h1>文字检查器</h1>
+<div class="sub">完全离线 · 输入完毕自动检查 · 红色=确定问题 灰色=建议 绿色=没问题</div>
+
+<textarea id="input" placeholder="把微信里写好的话粘贴到这里，点「检查」"></textarea>
+<div class="btnrow">
+  <button class="btn-main" onclick="doCheck(true)">立即检查</button>
+  <button class="btn-sec" onclick="doClear()">清空</button>
+</div>
+<div id="result" class="result"></div>
+
+<div class="footer">红=确定有问题，灰=建议看看（可忽略）<br>
+修正后文本在「一键修正」下方，点「复制修正文本」再回微信粘贴</div>
+
+<script>
+var latestCorrected = '';
+var debounceTimer = null;
+
+/* 自动检查：停止输入 400ms 后触发（引擎耗时 <5ms，无性能压力） */
+document.getElementById('input').addEventListener('input', function(){
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(function(){ doCheck(false); }, 400);
+});
+/* 粘贴立即检查 */
+document.getElementById('input').addEventListener('paste', function(){
+  clearTimeout(debounceTimer);
+  setTimeout(function(){ doCheck(false); }, 50);
+});
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function doCheck(manual){
+  var text = document.getElementById('input').value;
+  var box = document.getElementById('result');
+  if(!text.trim()){ box.innerHTML=''; return; }
+  var t0 = performance.now();
+  var r = TextChecker.checkText(text);
+  var ms = Math.round(performance.now()-t0);
+  latestCorrected = r.corrected;
+
+  var html = '';
+  if(r.issues.length === 0){
+    html = '<div class="banner green">✓ 检查通过，没有发现问题（'+ms+'ms）</div>' +
+           '<div class="summary">检查了 '+text.length+' 个字符</div>';
+  } else {
+    html += '<div class="summary">发现 '+r.stats.red+' 个确定问题、'+r.stats.gray+' 个建议项 · 耗时 '+ms+'ms</div>';
+    // 高亮预览
+    var segs = [], pos = 0;
+    r.issues.filter(function(i){return i.length>0;}).forEach(function(i){
+      if(i.index > pos) segs.push({t:'n', s:text.slice(pos, i.index)});
+      segs.push({t:i.level, s:text.substr(i.index, i.length)});
+      pos = i.index + i.length;
+    });
+    if(pos < text.length) segs.push({t:'n', s:text.slice(pos)});
+    var hl = segs.map(function(s){
+      return s.t==='n' ? esc(s.s) :
+        (s.t==='red' ? '<span class="hl-red">'+esc(s.s)+'</span>' : '<span class="hl-gray">'+esc(s.s)+'</span>');
+    }).join('');
+    html += '<div class="highlight-box">'+hl+'</div>';
+
+    // 红在前灰在后
+    r.issues.slice().sort(function(a,b){return a.level===b.level?0:(a.level==='red'?-1:1);}).forEach(function(i){
+      if(i.type === '标点不闭合'){
+        html += '<div class="issue gray"><span class="tag gray">提示</span><span class="tag">'+esc(i.type)+'</span>'+
+                '<div class="msg">'+esc(i.message)+'</div></div>';
+        return;
+      }
+      var body = i.length>0
+        ? '<span class="orig">'+esc(i.original)+'</span>&rarr;<span class="sug">'+esc(i.suggestion||'(删除)')+'</span>'
+        : '<span class="sug">'+esc(i.suggestion)+'</span>';
+      html += '<div class="issue '+i.level+'">'+
+        '<span class="tag '+i.level+'">'+(i.level==='red'?'问题':'建议')+'</span>'+
+        '<span class="tag">'+esc(i.type)+'</span>'+
+        (i.fixable?'<span class="tag fix">可自动修</span>':'')+
+        '<div style="margin-top:6px">'+body+'</div>'+
+        '<div class="msg">'+esc(i.message)+'</div></div>';
+    });
+    if(r.stats.gray > 0){
+      html += '<div class="btnrow"><button class="btn-main" onclick="doFix()">一键修正（红+灰可修项）</button></div>';
+    }
+    // 无论有无问题，都提供复制（修正后）文本入口
+    if(r.issues.length > 0){
+      html += '<div class="btnrow" style="margin-top:0"><button class="btn-copy" onclick="doCopy()">复制修正文本</button></div>';
+    }
+  }
+  box.innerHTML = html;
+}
+
+function doCopy(){
+  var text = latestCorrected || document.getElementById('input').value;
+  if(!text) return;
+  function ok(){ alert('已复制，请回微信粘贴'); }
+  if(window.AndroidBridge && window.AndroidBridge.copy){
+    window.AndroidBridge.copy(text); ok(); return;
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(ok).catch(function(){ fallbackCopy(text, ok); });
+  } else { fallbackCopy(text, ok); }
+}
+function fallbackCopy(text, ok){
+  var ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta);
+  ta.select(); document.execCommand('copy');
+  document.body.removeChild(ta); ok();
+}
+
+function doFix(){
+  document.getElementById('input').value = latestCorrected;
+  doCheck();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function doClear(){
+  document.getElementById('input').value='';
+  document.getElementById('result').innerHTML='';
+}
+
+/* 长按复制场景：剪贴板有内容时自动填入（手机端省一步） */
+if(navigator.clipboard && navigator.clipboard.readText){
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='visible' && !document.getElementById('input').value){
+      navigator.clipboard.readText().then(function(t){
+        if(t && t.trim()) document.getElementById('input').value = t;
+      }).catch(function(){ /* 无权限则忽略 */ });
+    }
+  });
+}
+</script>
+</body>
+</html>
