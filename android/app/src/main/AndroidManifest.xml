@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 唯一权限：悬浮窗。刻意不申请 INTERNET —— 检查引擎打包在 assets 内，全程离线 -->
+    <!-- 权限说明：
+         SYSTEM_ALERT_WINDOW —— 悬浮球
+         INTERNET —— v1.2 云端AI检查（用户主动配置的免费模型服务商，仅点「云端检查」时文本出网）
+         本地规则检查与本地模型检查仍完全离线可用 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"

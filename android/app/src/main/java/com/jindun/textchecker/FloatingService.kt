@@ -266,7 +266,84 @@ class FloatingService : Service() {
             }
         }
 
+        /** 云端检查（免费模型，OpenAI 兼容协议）：配置缺失时回退本地 */
+        @JavascriptInterface
+        fun runCloud(text: String) {
+            aiExecutor.execute {
+                val sp = getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE)
+                val url = sp.getString(MainActivity.K_URL, "") ?: ""
+                val model = sp.getString(MainActivity.K_MODEL, "") ?: ""
+                val key = sp.getString(MainActivity.K_KEY, "") ?: ""
+                if (url.isEmpty() || key.isEmpty()) {
+                    toast("尚未配置云端模型：请打开 App 保存 API Key（智谱 glm-4.7-flash 永久免费）")
+                    postJs("window.receiveCloud(${JSONObject.quote("{\"error\":\"未配置\"}")});")
+                    return@execute
+                }
+                try {
+                    val content = callOpenAiCompat(url, model, key, text)
+                    // 剥离可能的 markdown 代码围栏再解析
+                    val cleaned = content.trim()
+                        .removePrefix("```json").removePrefix("```")
+                        .removeSuffix("```").trim()
+                    val obj = org.json.JSONObject(cleaned)
+                    obj.put("raw", cleaned)
+                    postJs("window.receiveCloud(${JSONObject.quote(obj.toString())});")
+                } catch (e: Throwable) {
+                    toast("云端检查失败: ${e.message}")
+                    postJs("window.receiveCloud(${JSONObject.quote("{\"error\":\"${e.message?.take(120) ?: "未知错误"}\"}")});")
+                }
+            }
+        }
+
         @JavascriptInterface
         fun aiDone() { /* 预留：AI 结果回传完成回调 */ }
+    }
+
+    private fun toast(msg: String) {
+        mainHandler.post {
+            Toast.makeText(this@FloatingService, msg, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun postJs(js: String) {
+        mainHandler.post {
+            webView?.evaluateJavascript(js, null)
+        }
+    }
+
+    /** OpenAI 兼容 chat/completions 调用，返回首条 message.content */
+    private fun callOpenAiCompat(url: String, model: String, key: String, text: String): String {
+        val systemPrompt = "你是中文文字校对助手。检查用户给出的文本，只报告硬错误：" +
+                "错别字（含音近字误打）、标点错误、明显语病。不要改写风格、不要润色、不要评判内容。" +
+                "严格只输出 JSON，格式：{\"corrected\":\"修正后的全文\",\"issues\":[{" +
+                "\"original\":\"错误片段\",\"suggestion\":\"改正片段\",\"reason\":\"简短理由\"}]}。" +
+                "没有错误时 issues 为空数组，corrected 等于原文。不要输出任何 JSON 以外的内容。"
+        val body = org.json.JSONObject().apply {
+            put("model", model)
+            put("temperature", 0.1)
+            put("messages", org.json.JSONArray().apply {
+                put(org.json.JSONObject().put("role", "system").put("content", systemPrompt))
+                put(org.json.JSONObject().put("role", "user").put("content", text))
+            })
+        }
+        val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15000
+            readTimeout = 60000
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Authorization", "Bearer $key")
+        }
+        conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        val resp = stream?.bufferedReader()?.readText() ?: ""
+        conn.disconnect()
+        if (code !in 200..299) {
+            throw RuntimeException("HTTP $code: ${resp.take(160)}")
+        }
+        val root = org.json.JSONObject(resp)
+        return root.getJSONArray("choices").getJSONObject(0)
+            .getJSONObject("message").getString("content")
     }
 }

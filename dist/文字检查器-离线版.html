@@ -283,7 +283,8 @@
 <textarea id="input" placeholder="把微信里写好的话粘贴到这里，点「检查」"></textarea>
 <div class="btnrow">
   <button class="btn-main" onclick="doCheck(true)">立即检查</button>
-  <button class="btn-ai" id="btnAi" onclick="doAiCheck()" style="display:none">本地AI检查</button>
+  <button class="btn-ai" id="btnCloud" onclick="doCloudCheck()" style="display:none">云端检查</button>
+  <button class="btn-ai" id="btnAi" onclick="doAiCheck()" style="display:none">本地AI</button>
   <button class="btn-sec" onclick="doClear()">清空</button>
 </div>
 <div id="result" class="result"></div>
@@ -470,6 +471,74 @@ function applyAi(idx){
 /* 仅 Android 桥可用时显示 AI 按钮；网页版隐藏 */
 if(window.AndroidBridge && window.AndroidBridge.runAi){
   document.getElementById('btnAi').style.display = '';
+}
+if(window.AndroidBridge && window.AndroidBridge.runCloud){
+  document.getElementById('btnCloud').style.display = '';
+}
+
+/* ================= 云端检查（免费模型，OpenAI 兼容） ================= */
+var cloudResult = null;
+
+function doCloudCheck(){
+  if(!(window.AndroidBridge && window.AndroidBridge.runCloud)){
+    alert('云端检查仅在手机 App 内可用'); return;
+  }
+  var text = document.getElementById('input').value;
+  if(!text.trim()){ alert('请先输入要检查的文字'); return; }
+  document.getElementById('aiBox').innerHTML =
+    '<div class="ai-wait">云端 AI 检查中…（首次或网络慢时约数秒）</div>';
+  window.AndroidBridge.runCloud(text);
+}
+
+/* Kotlin 回传：{"corrected":"...","issues":[{original,suggestion,reason}],"error":"..."} */
+window.receiveCloud = function(json){
+  var box = document.getElementById('aiBox');
+  try { cloudResult = JSON.parse(json); } catch(e){ cloudResult = {error:'返回解析失败'}; }
+  if(cloudResult.error){
+    box.innerHTML = '<div class="issue red"><span class="tag red">失败</span>'+
+      '<div class="msg">'+esc(String(cloudResult.error))+'</div></div>';
+    return;
+  }
+  renderCloud();
+};
+
+function renderCloud(){
+  var box = document.getElementById('aiBox');
+  var r = cloudResult;
+  if(!r) return;
+  var issues = r.issues || [];
+  var text = document.getElementById('input').value;
+  var changed = r.corrected && r.corrected !== text;
+  var html = '';
+  if(!issues.length && !changed){
+    box.innerHTML = '<div class="banner green">✓ 云端 AI 检查通过，没有发现错字或语病</div>';
+    return;
+  }
+  html += '<div class="summary">云端 AI 发现 '+issues.length+' 处问题'+(changed?'（另有全文修正）':'')+'</div>';
+  issues.forEach(function(i){
+    html += '<div class="issue blue">'+
+      '<span class="tag blue">AI</span>'+
+      '<div style="margin-top:6px"><span class="orig">'+esc(i.original||'')+'</span>&rarr;'+
+      '<span class="sug blue">'+esc(i.suggestion||'')+'</span></div>'+
+      (i.reason?'<div class="msg">'+esc(i.reason)+'</div>':'')+
+      '</div>';
+  });
+  if(changed){
+    html += '<div class="issue blue"><span class="tag blue">AI</span><span class="tag">修正全文</span>'+
+      '<div class="highlight-box" style="margin-top:8px">'+esc(r.corrected)+'</div>'+
+      '<div class="btnrow" style="margin:8px 0 0"><button class="btn-ai" onclick="applyCloud()">采用修正全文</button></div></div>';
+  }
+  box.innerHTML = html;
+}
+
+function applyCloud(){
+  if(!cloudResult || !cloudResult.corrected) return;
+  document.getElementById('input').value = cloudResult.corrected;
+  cloudResult = null;
+  aiIssues = [];
+  doCheck(false);
+  document.getElementById('aiBox').innerHTML = '<div class="banner green">✓ 已采用云端修正文本</div>';
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 </script>
 </body>
